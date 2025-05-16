@@ -44,10 +44,11 @@ def lime():
     try:
         data = request.get_json(force=True)
         text = data.get('text', '')
+
         print("🧠 LIME başlatıldı. Yorum:", text)
 
         result = predict_texts([text])
-        print("🔍 predict_texts çıktısı:", result)
+        print("🔍 predict_texts çıktısı:", result, "şekil:", result.shape)
 
         exp = explainer.explain_instance(
             text_instance=text,
@@ -63,6 +64,7 @@ def lime():
     except Exception as e:
         print("❌ LIME hatası:", e)
         return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':
