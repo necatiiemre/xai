@@ -36,7 +36,7 @@ def predict_texts(texts):
         raise Exception("Model veya tokenizer yüklenemedi.")
     sequences = tokenizer.texts_to_sequences(texts)
     padded = pad_sequences(sequences, maxlen=maxlen)
-    preds = model.predict(padded)
+    preds = model.predict(padded, batch_size=8)
     return np.hstack([1 - preds, preds])
 
 @app.route('/predict', methods=['POST'])
