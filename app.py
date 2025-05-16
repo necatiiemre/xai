@@ -42,22 +42,34 @@ def predict_texts(texts):
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
+        if model is None or tokenizer is None:
+            return jsonify({'error': 'Model veya tokenizer yüklenemedi. Sunucu hatası.'}), 503
+
         data = request.get_json(force=True)
         text = data.get('text', '')
+        if not isinstance(text, str) or len(text.strip()) == 0:
+            return jsonify({'error': 'Yorum eksik veya hatalı gönderildi.'}), 400
+
         print("📝 Prediction isteği:", text)
         output = predict_texts([text])
         score = float(output[0][1])
         return jsonify({'prediction': score})
+    except ValueError as ve:
+        print("❌ predict ValueError:", ve)
+        return jsonify({'error': f'Geçersiz veri: {str(ve)}'}), 400
     except Exception as e:
         print("❌ predict hatası:", e)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Bir hata oluştu: {str(e)}'}), 500
 
 @app.route('/lime', methods=['POST'])
 def lime():
     try:
+        if model is None or tokenizer is None:
+            return jsonify({'error': 'Model veya tokenizer yüklenemedi. Sunucu hatası.'}), 503
+
         data = request.get_json(force=True)
         text = data.get('text', '')
-        if len(text.strip().split()) < 3:
+        if not isinstance(text, str) or len(text.strip().split()) < 3:
             return jsonify({'error': 'Yorum çok kısa, en az 3 kelime girin.'}), 400
 
         print("🧠 LIME başlatıldı. Yorum:", text)
@@ -67,15 +79,18 @@ def lime():
             classifier_fn=predict_texts,
             labels=[1],
             num_features=10,
-            num_samples=500
+            num_samples=100
         )
 
         explanation = dict(exp.as_list(label=1))
         print("✅ Açıklama üretildi:", explanation)
         return jsonify({'explanation': explanation})
+    except ValueError as ve:
+        print("❌ LIME ValueError:", ve)
+        return jsonify({'error': f'Geçersiz veri: {str(ve)}'}), 400
     except Exception as e:
-        print("❌ LIME hatası:", e)
-        return jsonify({'error': str(e)}), 500
+        print("❌ LIME genel hata:", e)
+        return jsonify({'error': f'Bir hata oluştu: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
