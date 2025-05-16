@@ -67,7 +67,7 @@ def lime():
             classifier_fn=predict_texts,
             labels=[1],
             num_features=10,
-            num_samples=50
+            num_samples=500
         )
 
         explanation = dict(exp.as_list(label=1))
