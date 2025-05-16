@@ -10,14 +10,14 @@ from lime.lime_text import LimeTextExplainer
 
 app = Flask(__name__)
 
-# 🌍 Global model/tokenizer yüklenir
+# 🌍 Global yüklemeler
+model, tokenizer = None, None
 try:
     print("🚀 Model yükleniyor...")
     model = load_model("model.h5")
     print("✅ model.h5 yüklendi.")
 except Exception as e:
     print("❌ model yükleme hatası:", e)
-    model = None
 
 try:
     print("🚀 Tokenizer yükleniyor...")
@@ -26,54 +26,50 @@ try:
     print("✅ tokenizer.json yüklendi.")
 except Exception as e:
     print("❌ tokenizer yükleme hatası:", e)
-    tokenizer = None
 
 maxlen = 100
 explainer = LimeTextExplainer(class_names=["negatif", "pozitif"])
 
 def predict_texts(texts):
-    if model is None or tokenizer is None:
-        raise Exception("Model veya tokenizer yüklenemedi.")
-    sequences = tokenizer.texts_to_sequences(texts)
-    padded = pad_sequences(sequences, maxlen=maxlen)
-    preds = model.predict(padded, batch_size=8)
-    return np.hstack([1 - preds, preds])
+    try:
+        if model is None or tokenizer is None:
+            return np.array([[0.5, 0.5]])  # default nötr skor
+        sequences = tokenizer.texts_to_sequences(texts)
+        padded = pad_sequences(sequences, maxlen=maxlen)
+        preds = model.predict(padded, batch_size=8)
+        return np.hstack([1 - preds, preds])
+    except Exception as e:
+        print("❌ Tahmin sırasında hata:", e)
+        return np.array([[0.5, 0.5]])  # fallback skor
 
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        if model is None or tokenizer is None:
-            return jsonify({'error': 'Model veya tokenizer yüklenemedi. Sunucu hatası.'}), 503
-
         data = request.get_json(force=True)
         text = data.get('text', '')
         if not isinstance(text, str) or len(text.strip()) == 0:
-            return jsonify({'error': 'Yorum eksik veya hatalı gönderildi.'}), 400
+            return jsonify({'error': 'Yorum boş veya hatalı.'}), 400
 
         print("📝 Prediction isteği:", text)
         output = predict_texts([text])
         score = float(output[0][1])
         return jsonify({'prediction': score})
-    except ValueError as ve:
-        print("❌ predict ValueError:", ve)
-        return jsonify({'error': f'Geçersiz veri: {str(ve)}'}), 400
     except Exception as e:
-        print("❌ predict hatası:", e)
-        return jsonify({'error': f'Bir hata oluştu: {str(e)}'}), 500
+        print("❌ /predict genel hata:", e)
+        return jsonify({'error': 'Bir hata oluştu, yorum işlenemedi.'}), 500
 
 @app.route('/lime', methods=['POST'])
 def lime():
     try:
-        if model is None or tokenizer is None:
-            return jsonify({'error': 'Model veya tokenizer yüklenemedi. Sunucu hatası.'}), 503
-
         data = request.get_json(force=True)
         text = data.get('text', '')
         if not isinstance(text, str) or len(text.strip().split()) < 3:
             return jsonify({'error': 'Yorum çok kısa, en az 3 kelime girin.'}), 400
 
-        print("🧠 LIME başlatıldı. Yorum:", text)
+        if model is None or tokenizer is None:
+            return jsonify({'error': 'Model veya tokenizer yüklenemedi.'}), 503
 
+        print("🧠 LIME başlatıldı. Yorum:", text)
         exp = explainer.explain_instance(
             text_instance=text,
             classifier_fn=predict_texts,
@@ -81,17 +77,16 @@ def lime():
             num_features=10,
             num_samples=100
         )
-
         explanation = dict(exp.as_list(label=1))
         print("✅ Açıklama üretildi:", explanation)
         return jsonify({'explanation': explanation})
-    except ValueError as ve:
-        print("❌ LIME ValueError:", ve)
-        return jsonify({'error': f'Geçersiz veri: {str(ve)}'}), 400
     except Exception as e:
-        print("❌ LIME genel hata:", e)
-        return jsonify({'error': f'Bir hata oluştu: {str(e)}'}), 500
+        print("❌ /lime genel hata:", e)
+        return jsonify({'error': 'Açıklama üretilemedi. Lütfen daha sonra tekrar deneyin.'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    try:
+        app.run(host='0.0.0.0', port=port)
+    except Exception as e:
+        print("❌ Sunucu başlatma hatası:", e)
