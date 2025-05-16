@@ -10,7 +10,7 @@ from lime.lime_text import LimeTextExplainer
 # Load model and tokenizer
 model = load_model("model.h5")
 with open("tokenizer.json", "r", encoding="utf-8") as f:
-    tokenizer = tokenizer_from_json(json.load(f))
+    tokenizer = tokenizer_from_json(f.read())  
 
 maxlen = 100  # or whatever you used
 
