@@ -41,11 +41,29 @@ def predict():
 
 @app.route('/lime', methods=['POST'])
 def lime():
-    data = request.get_json(force=True)
-    text = data.get('text', '')
-    exp = explainer.explain_instance(text, predict_texts, labels=[1], num_features=10)
-    explanation = dict(exp.as_list(label=1))
-    return jsonify({'explanation': explanation})
+    try:
+        data = request.get_json(force=True)
+        text = data.get('text', '')
+        print("🧠 LIME başlatıldı. Yorum:", text)
+
+        result = predict_texts([text])
+        print("🔍 predict_texts çıktısı:", result)
+
+        exp = explainer.explain_instance(
+            text_instance=text,
+            classifier_fn=predict_texts,
+            labels=[1],
+            num_features=10
+        )
+
+        explanation = dict(exp.as_list(label=1))
+        print("✅ Açıklama üretildi.")
+        return jsonify({'explanation': explanation})
+
+    except Exception as e:
+        print("❌ LIME hatası:", e)
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
